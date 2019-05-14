@@ -107,6 +107,8 @@ function getSpotifyRecommendations (token) {
 
           });
 
+          return songsArray;
+
         })
         .catch(error => console.error(error));
     })
