@@ -22,7 +22,11 @@ CREATE TABLE songs (
 );
 
 CREATE TABLE user_songs (
-  id INTEGER NOT NULL
+  id SERIAL PRIMARY KEY,
+  FOREIGN KEY (song_id) REFERENCES songs(id),
+  FOREIGN KEY (emotion_id) REFERENCES emotions(id),
+  FOREIGN KEY (user) REFERENCES users(userID),
+  songs_liked BOOLEAN
 );
 -- CREATE TABLE IF NOT EXISTS events (
 --   id SERIAL PRIMARY KEY, 
