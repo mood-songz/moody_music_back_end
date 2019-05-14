@@ -32,11 +32,3 @@ CREATE TABLE IF NOT EXISTS user_songs (
   FOREIGN KEY (emotion_id) REFERENCES emotions (id),
   FOREIGN KEY (users_id) REFERENCES users (id)
 );
--- CREATE TABLE IF NOT EXISTS events (
---   id SERIAL PRIMARY KEY, 
---   link TEXT, 
---   name TEXT, 
---   summary TEXT,
---   event_date CHAR(15), 
---   location_id INTEGER NOT NULL REFERENCES locations(id) 
--- );
