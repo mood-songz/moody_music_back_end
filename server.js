@@ -1,5 +1,4 @@
 'use strict';
-
 require('dotenv').config();
 const express = require('express');
 const app = express();
@@ -23,8 +22,6 @@ app.use(cors());
 
 
 /*************************  image handler *****************************************/
-
-
 var storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'public');
@@ -36,7 +33,6 @@ var storage = multer.diskStorage({
 
 //define variable to use sessoion later
 var sess;
-
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
   //request session
@@ -50,16 +46,12 @@ app.post('/upload', (req, res) => {
       return res.status(500).json(err);
     }
 
-
     facepp.setApiKey(process.env.FACE_API_KEY);
     facepp.setApiSecret(process.env.FACE_API_SEC);
     const fs = require('fs');
     var parameters = {
-
       return_attributes: 'ethnicity,beauty,eyegaze,emotion',
-
       image_base64: fs.readFileSync(req.file.path).toString('base64')
-
     };
     facepp.post('/detect', parameters, function(err, res) {
       let obj=res.faces[0].attributes.emotion;
@@ -79,10 +71,6 @@ app.post('/upload', (req, res) => {
   });
 
 });
-
-
-
-
 
 
 
