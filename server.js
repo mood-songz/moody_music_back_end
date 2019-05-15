@@ -6,7 +6,7 @@ const app = express();
 const cors = require('cors');
 const superagent = require('superagent');
 const pg = require('pg');
-
+const fs = require('fs');
 //face++ api package
 var facepp = require('face-plusplus-node');
 //require session to store keyword which is got from face++ api based on image
@@ -35,13 +35,13 @@ var storage = multer.diskStorage({
 });
 
 //define variable to use sessoion later
-var sess;
-
+// var sess;
+let keyword;
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
   //request session
-  sess=req.session;
-  sess.keyword;
+  // sess=req.session;
+  // sess.keyword;
 
   upload(req, res, function (err) {
     if (err instanceof multer.MulterError) {
@@ -53,35 +53,39 @@ app.post('/upload', (req, res) => {
 
     facepp.setApiKey(process.env.FACE_API_KEY);
     facepp.setApiSecret(process.env.FACE_API_SEC);
-    const fs = require('fs');
     var parameters = {
-
       return_attributes: 'ethnicity,beauty,eyegaze,emotion',
-
       image_base64: fs.readFileSync(req.file.path).toString('base64')
-
     };
-    facepp.post('/detect', parameters, function(err, res) {
-      let obj=res.faces[0].attributes.emotion;
+
+    facepp.post('/detect', parameters, function(err, faceappResponse) {
+      let obj = faceappResponse.faces[0].attributes.emotion;
       //  let i = arr.indexOf(Math.max(...arr));
-      let max=0;
+      if(err){
+        console.log('err');
+      }
+      let maxEmotionScore = 0;
       for (var o in obj) {
-        if(obj[o]>max){
-          max=obj[o];
-          sess.keyword=o;
+        if(obj[o] > maxEmotionScore){
+          maxEmotionScore = obj[o];
+          if(o === 'happiness'|| o === 'surprise'){
+            keyword = 'happy';
+          } else if (o === 'neutral' || o === 'fear'){
+            keyword = 'neutral';
+          } else {
+            keyword = 'sadness';
+          }
         }
       }
-      console.log(sess.keyword);
 
+      console.log(keyword);
+      let response = {'emotion': keyword, 'success' : true};
+      return res.status(200).send(response);
     });
-    return res.status(200).send(req.file.path);
 
   });
 
 });
-
-
-
 
 
 
@@ -142,7 +146,7 @@ function getSpotifyRecommendations (token) {
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'angry', })
+    .query({'type': 'track', 'query': 'angry'})
     .then(response => {response.body;
 
       //forEach track
@@ -152,7 +156,7 @@ function getSpotifyRecommendations (token) {
       response.body.tracks.items.forEach(x => {
         songsArray.push(new Song(x));
       });
-      // console.log(songsArray);
+      console.log(songsArray);
 
       let valenceRequestString = songsArray.map(x => x.spotifyID).join(',');
 
