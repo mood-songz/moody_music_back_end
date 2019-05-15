@@ -16,7 +16,7 @@ app.use(session({secret:'ssshhhhh'}));
 const multer=require('multer');
 
 // use environment variable, or, if it's undefined, use 8080 by default
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 8080;
 
 app.use(cors());
 
