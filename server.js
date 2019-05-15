@@ -78,28 +78,54 @@ const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
 
 function fillEmotionsTable() {
-  let moodArray = ['happy', 'sad', 'neutral'];
-  let insertStatement = 'INSERT INTO emotions (emotion, id) VALUES ($1, $2);';
-  moodArray.forEach((mood, i )=> {
-    let values = [mood, i + 1];
-    client.query(insertStatement, values);
-  });
+  client.query('SELECT * FROM emotions')
+    .then(data => {
+      if (data.rowCount === 0) {
+        let moodArray = ['happy', 'sad', 'neutral'];
+        let insertStatement = 'INSERT INTO emotions (emotion, id) VALUES ($1, $2);';
+        moodArray.forEach((mood, i )=> {
+          let values = [mood, i + 1];
+          client.query(insertStatement, values);
+        });
+      }
+    });
 }
 
 /*************************  Endpoints  *****************************************/
 
 // gets recommendations for a playlist
-// If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/valence', (request, response) => {
+// If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/emotion', (request, response) => {
 //                       :emotion
 app.get('/recommendations', (request, response) => {
-  try {
-    getSpotifyToken()
-      .then(token => getSpotifyRecommendations(token))
-      .then(recommendations => response.send(recommendations))
-      .catch(error => console.error(error));
-  } catch( error ) {
-    console.error(error);
-  }
+  // emoValue = 1 for 'happy', = 2 for 'sad', = 3 for 'neutral'.
+  let emoValue = 3;
+  // if (emotion === 'happy') {
+  //   emoValue = 1;
+  // } else if (emotion === 'sad') {
+  //   emoValue = 2;
+  // } else if (emotion === 'neutral') {
+  //   emoValue = 3;
+  // }
+
+  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1;';
+  client.query(selectStatement, [emoValue])
+    .then(data => {
+      if (data.rowCount < 5) {
+        try {
+          getSpotifyToken()
+            .then(token => getSpotifyRecommendations(token))
+            // .then(recommendations => response.send(recommendations))
+            .catch(error => console.error(error));
+        } catch( error ) {
+          console.error(error);
+        }
+      }
+    })
+    .then(
+      returnSongArray(emoValue)
+        .then(songArray => response.send(songArray))
+    )
+    .catch(error => console.error(error));
 });
 
 /************************* Constructors  *****************************************/
@@ -123,46 +149,31 @@ function getSpotifyToken() {
     .send({'grant_type': 'client_credentials'})
     .then(result => result.body.access_token);
 }
-
-
-// cuurently gets a song from spotify using cuurent id.
+// Uses access token to get random songs from spotify, and add them to database based on their valence.
 function getSpotifyRecommendations (token) {
-  // let songId = '6rqhFgbbKwnb9MLmUQDhG6';
-  //can either grab song by id or by array of id's. Not sure if this Api is possible to use
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'yellow'})
-    .then(response => {response.body;
-
-      //forEach track
-      //track.filter(valence)
+    .query({'type': 'track', 'query': 'angry'})
+    .then(response => {
 
       let songsArray = [];
-      response.body.tracks.items.forEach(x => {
-        songsArray.push(new Song(x));
+      response.body.tracks.items.forEach(item => {
+        songsArray.push(new Song(item));
       });
-      // console.log(songsArray);
 
+      // This code checks the emotions table, and fills if empty.
+      fillEmotionsTable();
+
+      // Sends request to Spotify API to retreive valence of each song.
       let valenceRequestString = songsArray.map(x => x.spotifyID).join(',');
-
-      // This code should check the emotions table, and fill it if it's empty
-      client.query('SELECT * FROM emotions')
-        .then(data => {
-          if (data.rowCount === 0) {
-            fillEmotionsTable();
-          }
-        });
-
       return superagent.get('https://api.spotify.com/v1/audio-features/')
         .set({'Authorization': `Bearer ${token}`})
         .query({'ids': valenceRequestString})
         .then(response => {
-          // console.log(response.body.audio_features);
 
+          // Assign an emotion_id to each song, based on valence.
           songsArray.forEach((song, i) => {
-            // let selectStatement = `SELECT id FROM emotions WHERE emotion = $1;`;
-            // let values=[];
             if (response.body.audio_features[i].valence > 0.7) {
               // happy
               song.emotion_id = 1;
@@ -174,11 +185,9 @@ function getSpotifyRecommendations (token) {
               song.emotion_id = 3;
             }
           });
-          // console.log(songsArray);
 
+          // Adds song to database if it does not already exist.
           songsArray.forEach(song => {
-
-            // Need logic to determine whether or not a song already exists in songs database, using spotifyID.
             client.query('SELECT * FROM songs WHERE spotifyID = $1;', [song.spotifyID])
               .then(data => {
                 if (data.rowCount === 0) {
@@ -190,16 +199,21 @@ function getSpotifyRecommendations (token) {
                   console.log(`${song.title} already existed inside database.`);
                 }
               });
-
           });
-
-          return songsArray;
         })
         .catch(error => console.error(error));
     })
     .catch(error => console.error(error));
 }
 
-app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
+// Returns the first 5 songs that match the specified emotion_id value.
+function returnSongArray(emoValue) {
+  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1 LIMIT 5;';
 
-// 'offset': Math.ceil(Math.random(1, 1000))
+  return client.query(selectStatement, [emoValue])
+    .then(data => {
+      return data.rows;
+    });
+}
+
+app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
