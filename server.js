@@ -1,5 +1,4 @@
 'use strict';
-
 require('dotenv').config();
 const express = require('express');
 const app = express();
@@ -23,8 +22,6 @@ app.use(cors());
 
 
 /*************************  image handler *****************************************/
-
-
 var storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'public');
@@ -35,8 +32,8 @@ var storage = multer.diskStorage({
 });
 
 //define variable to use sessoion later
-// var sess;
 let keyword;
+
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
   //request session
@@ -49,7 +46,6 @@ app.post('/upload', (req, res) => {
     } else if (err) {
       return res.status(500).json(err);
     }
-
 
     facepp.setApiKey(process.env.FACE_API_KEY);
     facepp.setApiSecret(process.env.FACE_API_SEC);
@@ -87,45 +83,72 @@ app.post('/upload', (req, res) => {
 
 });
 
-
-
-
 // Database Setup
+
 const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
 
-// Constructor Functions
+function fillEmotionsTable() {
+  client.query('SELECT * FROM emotions')
+    .then(data => {
+      if (data.rowCount === 0) {
+        let moodArray = ['happy', 'sad', 'neutral'];
+        let insertStatement = 'INSERT INTO emotions (emotion, id) VALUES ($1, $2);';
+        moodArray.forEach((mood, i )=> {
+          let values = [mood, i + 1];
+          client.query(insertStatement, values);
+        });
+      }
+    });
+}
+
+/*************************  Endpoints  *****************************************/
+
+// gets recommendations for a playlist
+// If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/emotion', (request, response) => {
+//                       :emotion
+app.get('/recommendations', (request, response) => {
+  // emoValue = 1 for 'happy', = 2 for 'sad', = 3 for 'neutral'.
+  let emoValue = 3;
+  // if (emotion === 'happy') {
+  //   emoValue = 1;
+  // } else if (emotion === 'sad') {
+  //   emoValue = 2;
+  // } else if (emotion === 'neutral') {
+  //   emoValue = 3;
+  // }
+
+  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1;';
+  client.query(selectStatement, [emoValue])
+    .then(data => {
+      if (data.rowCount < 5) {
+        try {
+          getSpotifyToken()
+            .then(token => getSpotifyRecommendations(token))
+            // .then(recommendations => response.send(recommendations))
+            .catch(error => console.error(error));
+        } catch( error ) {
+          console.error(error);
+        }
+      }
+    })
+    .then(
+      returnSongArray(emoValue)
+        .then(songArray => response.send(songArray))
+    )
+    .catch(error => console.error(error));
+});
+
+/************************* Constructors  *****************************************/
 
 function Song(item) {
   this.title = item.name;
   this.artist = item.artists[0].name;
   this.spotifyID = item.id;
   this.duration = item.duration_ms;
-  this.emotion_id = '';
+  this.emotion_id = 0;
   this.numLikes = 0;
-
 }
-
-/*************************  Endpoints  *****************************************/
-
-// gets recommendations for a playlist
-// If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/valence', (request, response) => {
-
-app.get('/recommendations', (request, response) => {
-  try {
-    getSpotifyToken()
-      .then(token => getSpotifyRecommendations(token))
-      .then(recommendations => response.send(recommendations))
-      .catch(error => console.error(error));
-  } catch( error ) {
-    console.error(error);
-  }
-});
-
-
-/************************* Constructors  *****************************************/
-
-
 
 /*************************  Helper Functions  *****************************************/
 // requests an access token from Spotify
@@ -137,62 +160,71 @@ function getSpotifyToken() {
     .send({'grant_type': 'client_credentials'})
     .then(result => result.body.access_token);
 }
-
-
-// cuurently gets a song from spotify using cuurent id.
+// Uses access token to get random songs from spotify, and add them to database based on their valence.
 function getSpotifyRecommendations (token) {
-  // let songId = '6rqhFgbbKwnb9MLmUQDhG6';
-  //can either grab song by id or by array of id's. Not sure if this Api is possible to use
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
     .query({'type': 'track', 'query': 'angry'})
-    .then(response => {response.body;
-
-      //forEach track
-      //track.filter(valence)
+    .then(response => {
 
       let songsArray = [];
-      response.body.tracks.items.forEach(x => {
-        songsArray.push(new Song(x));
+      response.body.tracks.items.forEach(item => {
+        songsArray.push(new Song(item));
       });
-      console.log(songsArray);
 
+      // This code checks the emotions table, and fills if empty.
+      fillEmotionsTable();
+
+      // Sends request to Spotify API to retreive valence of each song.
       let valenceRequestString = songsArray.map(x => x.spotifyID).join(',');
-
       return superagent.get('https://api.spotify.com/v1/audio-features/')
         .set({'Authorization': `Bearer ${token}`})
         .query({'ids': valenceRequestString})
         .then(response => {
-          // console.log(response.body.audio_features);
 
-          songsArray.forEach((x, i) => {
+          // Assign an emotion_id to each song, based on valence.
+          songsArray.forEach((song, i) => {
             if (response.body.audio_features[i].valence > 0.7) {
-              x.emotion_id = 'happy';
+              // happy
+              song.emotion_id = 1;
             } else if ( response.body.audio_features[i].valence < 0.3) {
-              x.emotion_id = 'sad';
+              // sad
+              song.emotion_id = 2;
             } else {
-              x.emotion_id = 'neutral';
+              // neutral
+              song.emotion_id = 3;
             }
           });
-          console.log(songsArray);
 
+          // Adds song to database if it does not already exist.
           songsArray.forEach(song => {
-            let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
-            let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
-            client.query(insertStatement, values);
-
+            client.query('SELECT * FROM songs WHERE spotifyID = $1;', [song.spotifyID])
+              .then(data => {
+                if (data.rowCount === 0) {
+                  let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
+                  let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
+                  client.query(insertStatement, values);
+                  console.log(`${song.title} was added to database.`);
+                } else {
+                  console.log(`${song.title} already existed inside database.`);
+                }
+              });
           });
-
-          return songsArray;
-
         })
         .catch(error => console.error(error));
     })
     .catch(error => console.error(error));
 }
 
+// Returns the first 5 songs that match the specified emotion_id value.
+function returnSongArray(emoValue) {
+  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1 LIMIT 5;';
+
+  return client.query(selectStatement, [emoValue])
+    .then(data => {
+      return data.rows;
+    });
+}
+
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-
-
-// 'offset': Math.ceil(Math.random(1, 1000))
