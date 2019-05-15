@@ -216,6 +216,15 @@ function getSpotifyRecommendations (token) {
     .catch(error => console.error(error));
 }
 
+function returnSongArray(emoValue) {
+  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1 LIMIT 5;';
+
+  return client.query(selectStatement, [emoValue])
+    .then(data => {
+      return data.rows;
+    });
+}
+
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
 
 
