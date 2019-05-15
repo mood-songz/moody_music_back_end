@@ -72,23 +72,10 @@ app.post('/upload', (req, res) => {
 
 });
 
-
-
 // Database Setup
+
 const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
-
-// Constructor Functions
-
-function Song(item) {
-  this.title = item.name;
-  this.artist = item.artists[0].name;
-  this.spotifyID = item.id;
-  this.duration = item.duration_ms;
-  this.emotion_id = 0;
-  this.numLikes = 0;
-
-}
 
 function fillEmotionsTable() {
   let moodArray = ['happy', 'sad', 'neutral'];
@@ -103,7 +90,7 @@ function fillEmotionsTable() {
 
 // gets recommendations for a playlist
 // If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/valence', (request, response) => {
-
+//                       :emotion
 app.get('/recommendations', (request, response) => {
   try {
     getSpotifyToken()
@@ -115,10 +102,16 @@ app.get('/recommendations', (request, response) => {
   }
 });
 
-
 /************************* Constructors  *****************************************/
 
-
+function Song(item) {
+  this.title = item.name;
+  this.artist = item.artists[0].name;
+  this.spotifyID = item.id;
+  this.duration = item.duration_ms;
+  this.emotion_id = 0;
+  this.numLikes = 0;
+}
 
 /*************************  Helper Functions  *****************************************/
 // requests an access token from Spotify
@@ -139,7 +132,7 @@ function getSpotifyRecommendations (token) {
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'angry'})
+    .query({'type': 'track', 'query': 'yellow'})
     .then(response => {response.body;
 
       //forEach track
@@ -180,20 +173,27 @@ function getSpotifyRecommendations (token) {
               // neutral
               song.emotion_id = 3;
             }
-
           });
           // console.log(songsArray);
 
           songsArray.forEach(song => {
-            let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
-            let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
 
-            client.query(insertStatement, values);
+            // Need logic to determine whether or not a song already exists in songs database, using spotifyID.
+            client.query('SELECT * FROM songs WHERE spotifyID = $1;', [song.spotifyID])
+              .then(data => {
+                if (data.rowCount === 0) {
+                  let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
+                  let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
+                  client.query(insertStatement, values);
+                  console.log(`${song.title} was added to database.`);
+                } else {
+                  console.log(`${song.title} already existed inside database.`);
+                }
+              });
 
           });
 
           return songsArray;
-
         })
         .catch(error => console.error(error));
     })
@@ -201,6 +201,5 @@ function getSpotifyRecommendations (token) {
 }
 
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-
 
 // 'offset': Math.ceil(Math.random(1, 1000))
