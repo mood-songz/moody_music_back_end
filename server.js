@@ -107,16 +107,18 @@ function fillEmotionsTable() {
 // gets recommendations for a playlist
 // If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/emotion', (request, response) => {
 //                       :emotion
-app.get('/recommendations', (request, response) => {
+app.get('/recommendations/:emotion', (request, response) => {
+  let emotion = request.params.emotion;
+  console.log(emotion);
   // emoValue = 1 for 'happy', = 2 for 'sad', = 3 for 'neutral'.
-  let emoValue = 1;
-  // if (emotion === 'happy') {
-  //   emoValue = 1;
-  // } else if (emotion === 'sad') {
-  //   emoValue = 2;
-  // } else if (emotion === 'neutral') {
-  //   emoValue = 3;
-  // }
+  let emoValue;
+  if (emotion === 'happy') {
+    emoValue = 1;
+  } else if (emotion === 'sad') {
+    emoValue = 2;
+  } else if (emotion === 'neutral') {
+    emoValue = 3;
+  }
 
   let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1;';
   client.query(selectStatement, [emoValue])
