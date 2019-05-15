@@ -1,6 +1,5 @@
 'use strict';
 
-
 require('dotenv').config();
 const express = require('express');
 const app = express();
@@ -8,10 +7,84 @@ const cors = require('cors');
 const superagent = require('superagent');
 const pg = require('pg');
 
+//face++ api package
+var facepp = require('face-plusplus-node');
+//require session to store keyword which is got from face++ api based on image
+var session = require('express-session');
+app.use(session({secret:'ssshhhhh'}));
+//using for image handler
+const multer=require('multer');
+
 // use environment variable, or, if it's undefined, use 8080 by default
 const PORT = process.env.PORT || 8080;
 
 app.use(cors());
+
+
+
+/*************************  image handler *****************************************/
+
+
+var storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public');
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' +file.originalname );
+  }
+});
+
+//define variable to use sessoion later
+var sess;
+
+var upload = multer({ storage:storage }).single('theFile');
+app.post('/upload', (req, res) => {
+  //request session
+  sess=req.session;
+  sess.keyword;
+
+  upload(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      return res.status(500).json(err);
+    } else if (err) {
+      return res.status(500).json(err);
+    }
+
+
+    facepp.setApiKey(process.env.FACE_API_KEY);
+    facepp.setApiSecret(process.env.FACE_API_SEC);
+    const fs = require('fs');
+    var parameters = {
+
+      return_attributes: 'ethnicity,beauty,eyegaze,emotion',
+
+      image_base64: fs.readFileSync(req.file.path).toString('base64')
+
+    };
+    facepp.post('/detect', parameters, function(err, res) {
+      let obj=res.faces[0].attributes.emotion;
+      //  let i = arr.indexOf(Math.max(...arr));
+      let max=0;
+      for (var o in obj) {
+        if(obj[o]>max){
+          max=obj[o];
+          sess.keyword=o;
+        }
+      }
+      console.log(sess.keyword);
+
+    });
+    return res.status(200).send(req.file.path);
+
+  });
+
+});
+
+
+
+
+
+
 
 // Database Setup
 const client = new pg.Client(process.env.DATABASE_URL);
@@ -62,8 +135,8 @@ function getSpotifyToken() {
 }
 
 
-// cuurently gets a song from spotify using cuurent id. 
-function getSpotifyRecommendations (token) { 
+// cuurently gets a song from spotify using cuurent id.
+function getSpotifyRecommendations (token) {
   // let songId = '6rqhFgbbKwnb9MLmUQDhG6';
   //can either grab song by id or by array of id's. Not sure if this Api is possible to use
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
@@ -103,7 +176,7 @@ function getSpotifyRecommendations (token) {
           songsArray.forEach(song => {
             let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
             let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
-            client.query(insertStatement, values); 
+            client.query(insertStatement, values);
 
           });
 
