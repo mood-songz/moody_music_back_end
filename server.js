@@ -85,9 +85,18 @@ function Song(item) {
   this.artist = item.artists[0].name;
   this.spotifyID = item.id;
   this.duration = item.duration_ms;
-  this.emotion_id = '';
+  this.emotion_id = 0;
   this.numLikes = 0;
 
+}
+
+function fillEmotionsTable() {
+  let moodArray = ['happy', 'sad', 'neutral'];
+  let insertStatement = 'INSERT INTO emotions (emotion, id) VALUES ($1, $2);';
+  moodArray.forEach((mood, i )=> {
+    let values = [mood, i + 1];
+    client.query(insertStatement, values);
+  });
 }
 
 /*************************  Endpoints  *****************************************/
@@ -130,7 +139,7 @@ function getSpotifyRecommendations (token) {
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'angry', })
+    .query({'type': 'track', 'query': 'angry'})
     .then(response => {response.body;
 
       //forEach track
@@ -144,26 +153,41 @@ function getSpotifyRecommendations (token) {
 
       let valenceRequestString = songsArray.map(x => x.spotifyID).join(',');
 
+      // This code should check the emotions table, and fill it if it's empty
+      client.query('SELECT * FROM emotions')
+        .then(data => {
+          if (data.rowCount === 0) {
+            fillEmotionsTable();
+          }
+        });
+
       return superagent.get('https://api.spotify.com/v1/audio-features/')
         .set({'Authorization': `Bearer ${token}`})
         .query({'ids': valenceRequestString})
         .then(response => {
           // console.log(response.body.audio_features);
 
-          songsArray.forEach((x, i) => {
+          songsArray.forEach((song, i) => {
+            // let selectStatement = `SELECT id FROM emotions WHERE emotion = $1;`;
+            // let values=[];
             if (response.body.audio_features[i].valence > 0.7) {
-              x.emotion_id = 'happy';
+              // happy
+              song.emotion_id = 1;
             } else if ( response.body.audio_features[i].valence < 0.3) {
-              x.emotion_id = 'sad';
+              // sad
+              song.emotion_id = 2;
             } else {
-              x.emotion_id = 'neutral';
+              // neutral
+              song.emotion_id = 3;
             }
+
           });
-          console.log(songsArray);
+          // console.log(songsArray);
 
           songsArray.forEach(song => {
             let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
             let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
+
             client.query(insertStatement, values);
 
           });
