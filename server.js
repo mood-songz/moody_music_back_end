@@ -98,7 +98,7 @@ function fillEmotionsTable() {
 //                       :emotion
 app.get('/recommendations', (request, response) => {
   // emoValue = 1 for 'happy', = 2 for 'sad', = 3 for 'neutral'.
-  let emoValue = 3;
+  let emoValue = 1;
   // if (emotion === 'happy') {
   //   emoValue = 1;
   // } else if (emotion === 'sad') {
@@ -111,14 +111,13 @@ app.get('/recommendations', (request, response) => {
   client.query(selectStatement, [emoValue])
     .then(data => {
       if (data.rowCount < 5) {
-        try {
-          getSpotifyToken()
-            .then(token => getSpotifyRecommendations(token))
-            // .then(recommendations => response.send(recommendations))
-            .catch(error => console.error(error));
-        } catch( error ) {
-          console.error(error);
-        }
+        // try {
+        getSpotifyToken()
+          .then(token => getSpotifyRecommendations(token))
+          .catch(error => console.error(error));
+        // } catch( error ) {
+        //   console.error(error);
+        // }
       }
     })
     .then(
@@ -154,7 +153,7 @@ function getSpotifyRecommendations (token) {
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'angry'})
+    .query({'type': 'track', 'query': 'loud'})
     .then(response => {
 
       let songsArray = [];
