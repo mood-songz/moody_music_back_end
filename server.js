@@ -1,5 +1,4 @@
 'use strict';
-
 require('dotenv').config();
 const express = require('express');
 const app = express();
@@ -21,9 +20,8 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 
 
+
 /*************************  image handler *****************************************/
-
-
 var storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'public');
@@ -35,7 +33,6 @@ var storage = multer.diskStorage({
 
 //define variable to use sessoion later
 let keyword;
-let success;
 
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
@@ -50,7 +47,6 @@ app.post('/upload', (req, res) => {
       return res.status(500).json(err);
     }
 
-
     facepp.setApiKey(process.env.FACE_API_KEY);
     facepp.setApiSecret(process.env.FACE_API_SEC);
     var parameters = {
@@ -59,30 +55,27 @@ app.post('/upload', (req, res) => {
     };
 
     facepp.post('/detect', parameters, function(err, faceappResponse) {
-
-      if(faceappResponse.faces.length){
-        let obj = faceappResponse.faces[0].attributes.emotion;
-        //  let i = arr.indexOf(Math.max(...arr));
-        if(err){
-          // return res.send(err);
-        }
-        let maxEmotionScore = 0;
-        for (var o in obj) {
-          if(obj[o] > maxEmotionScore){
-            maxEmotionScore = obj[o];
-            if(o === 'happiness'|| o === 'surprise'){
-              keyword = 'happy';
-            } else if (o === 'neutral' || o === 'fear'){
-              keyword = 'neutral';
-            } else {
-              keyword = 'sadness';
-            }
-            success = true;
+      let obj = faceappResponse.faces[0].attributes.emotion;
+      //  let i = arr.indexOf(Math.max(...arr));
+      if(err){
+        console.log('err');
+      }
+      let maxEmotionScore = 0;
+      for (var o in obj) {
+        if(obj[o] > maxEmotionScore){
+          maxEmotionScore = obj[o];
+          if(o === 'happiness'|| o === 'surprise'){
+            keyword = 'happy';
+          } else if (o === 'neutral' || o === 'fear'){
+            keyword = 'neutral';
+          } else {
+            keyword = 'sadness';
           }
         }
-      }   
+      }
+
       console.log(keyword);
-      let response = {'emotion': keyword, 'success' : success};
+      let response = {'emotion': keyword, 'success' : true};
       return res.status(200).send(response);
     });
 
@@ -90,27 +83,28 @@ app.post('/upload', (req, res) => {
 
 });
 
-
 // Database Setup
+
 const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
 
-// Constructor Functions
-
-function Song(item) {
-  this.title = item.name;
-  this.artist = item.artists[0].name;
-  this.spotifyID = item.id;
-  this.duration = item.duration_ms;
-  this.emotion_id = '';
-  this.numLikes = 0;
-
+function fillEmotionsTable() {
+  client.query('SELECT * FROM emotions')
+    .then(data => {
+      if (data.rowCount === 0) {
+        let moodArray = ['happy', 'sad', 'neutral'];
+        let insertStatement = 'INSERT INTO emotions (emotion, id) VALUES ($1, $2);';
+        moodArray.forEach((mood, i )=> {
+          let values = [mood, i + 1];
+          client.query(insertStatement, values);
+        });
+      }
+    });
 }
 
 /*************************  Endpoints  *****************************************/
 
 // gets recommendations for a playlist
-
 // If we get API to work as we want to, possibly refactor to include userid and valence in string, for example:  app.get('/recommendations/userid/emotion', (request, response) => {
 //                       :emotion
 app.get('/recommendations/:emotion', (request, response) => {
@@ -146,10 +140,16 @@ app.get('/recommendations/:emotion', (request, response) => {
     .catch(error => console.error(error));
 });
 
-
 /************************* Constructors  *****************************************/
 
-
+function Song(item) {
+  this.title = item.name;
+  this.artist = item.artists[0].name;
+  this.spotifyID = item.id;
+  this.duration = item.duration_ms;
+  this.emotion_id = 0;
+  this.numLikes = 0;
+}
 
 /*************************  Helper Functions  *****************************************/
 // requests an access token from Spotify
@@ -161,61 +161,64 @@ function getSpotifyToken() {
     .send({'grant_type': 'client_credentials'})
     .then(result => result.body.access_token);
 }
-
-
-// cuurently gets a song from spotify using cuurent id.
+// Uses access token to get random songs from spotify, and add them to database based on their valence.
 function getSpotifyRecommendations (token) {
-  // let songId = '6rqhFgbbKwnb9MLmUQDhG6';
-  //can either grab song by id or by array of id's. Not sure if this Api is possible to use
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'angry'})
-    .then(response => {response.body;
-
-      //forEach track
-      //track.filter(valence)
+    .query({'type': 'track', 'query': 'loud'})
+    .then(response => {
 
       let songsArray = [];
-      response.body.tracks.items.forEach(x => {
-        songsArray.push(new Song(x));
+      response.body.tracks.items.forEach(item => {
+        songsArray.push(new Song(item));
       });
-      console.log(songsArray);
 
+      // This code checks the emotions table, and fills if empty.
+      fillEmotionsTable();
+
+      // Sends request to Spotify API to retreive valence of each song.
       let valenceRequestString = songsArray.map(x => x.spotifyID).join(',');
-
       return superagent.get('https://api.spotify.com/v1/audio-features/')
         .set({'Authorization': `Bearer ${token}`})
         .query({'ids': valenceRequestString})
         .then(response => {
-          // console.log(response.body.audio_features);
 
-          songsArray.forEach((x, i) => {
+          // Assign an emotion_id to each song, based on valence.
+          songsArray.forEach((song, i) => {
             if (response.body.audio_features[i].valence > 0.7) {
-              x.emotion_id = 'happy';
+              // happy
+              song.emotion_id = 1;
             } else if ( response.body.audio_features[i].valence < 0.3) {
-              x.emotion_id = 'sad';
+              // sad
+              song.emotion_id = 2;
             } else {
-              x.emotion_id = 'neutral';
+              // neutral
+              song.emotion_id = 3;
             }
           });
-          console.log(songsArray);
 
+          // Adds song to database if it does not already exist.
           songsArray.forEach(song => {
-            let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
-            let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
-            client.query(insertStatement, values);
-
+            client.query('SELECT * FROM songs WHERE spotifyID = $1;', [song.spotifyID])
+              .then(data => {
+                if (data.rowCount === 0) {
+                  let insertStatement = `INSERT INTO songs (title, artist, spotifyID, duration, emotion_id, numLikes) VALUES ($1, $2, $3, $4, $5, $6);`;
+                  let values = [song.title, song.artist, song.spotifyID, song.duration, song.emotion_id, song.numLikes];
+                  client.query(insertStatement, values);
+                  console.log(`${song.title} was added to database.`);
+                } else {
+                  console.log(`${song.title} already existed inside database.`);
+                }
+              });
           });
-
-          return songsArray;
-
         })
         .catch(error => console.error(error));
     })
     .catch(error => console.error(error));
 }
 
+// Returns the first 5 songs that match the specified emotion_id value.
 function returnSongArray(emoValue) {
   let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1 LIMIT 5;';
 
@@ -226,6 +229,3 @@ function returnSongArray(emoValue) {
 }
 
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-
-
-// 'offset': Math.ceil(Math.random(1, 1000))
