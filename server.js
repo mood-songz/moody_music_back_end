@@ -44,7 +44,6 @@ app.post('/upload', (req, res) => {
       return res.status(500).json(err);
     }
 
-
     facepp.setApiKey(process.env.FACE_API_KEY);
     facepp.setApiSecret(process.env.FACE_API_SEC);
     var parameters = {
@@ -54,7 +53,7 @@ app.post('/upload', (req, res) => {
 
     facepp.post('/detect', parameters, function(err, faceappResponse) {
 
-      if(faceappResponse.faces.length){
+      if(faceappResponse.faces && faceappResponse.faces.length){
         let obj = faceappResponse.faces[0].attributes.emotion;
         if(err){
           console.error(err);
