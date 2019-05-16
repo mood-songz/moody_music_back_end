@@ -66,7 +66,7 @@ app.post('/upload', (req, res) => {
             } else if (o === 'neutral' || o === 'fear'){
               keyword = 'neutral';
             } else {
-              keyword = 'sadness';
+              keyword = 'sad';
             }
             success = true;
           }
@@ -285,5 +285,3 @@ function returnSongArray(emoValue) {
 }
 
 app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-
-// newcomment
