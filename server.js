@@ -142,8 +142,8 @@ app.get('/recommendations/:emotion', (request, response) => {
 
 //get user from database
 app.get('/users/:username/:email', (request, response) => {
-  let username = request.params.username;
-  let email = request.params.email;
+  let username = request.params.username.toLowerCase();
+  let email = request.params.email.toLowerCase();
 
   let selectStatement = `SELECT * FROM users WHERE username = $1 and useremail = $2;`;
   let values = [username, email];
@@ -163,18 +163,34 @@ app.get('/users/:username/:email', (request, response) => {
   }
 });
 
+//returns a boolean if user in database
+app.get('/users/userexists/:username/:email', (request, response) => {
+  let username = request.params.username.toLowerCase();
+  let email = request.params.email.toLowerCase();
+
+  let selectStatement = `SELECT * FROM users WHERE username = $1 or useremail = $2;`;
+  let values = [username, email];
+
+  try {
+    client.query(selectStatement, values)
+      .then(users => response.send(users.rowCount > 0));
+  } catch (error) {
+    console.error(error);
+  }
+});
+
 //save user to database
 app.post('/users/:username/:email', (request, response) => {
-  let username = request.params.username;
-  let email = request.params.email;
+  let username = request.params.username.toLowerCase();
+  let email = request.params.email.toLowerCase();
+
   let insertStatement = `INSERT into users (username, useremail) VALUES ($1, $2);`;
   let selectStatement = `SELECT * FROM users WHERE username = $1 and useremail = $2;`;
   let values = [username, email];
   try {
     client.query(selectStatement, values)
       .then(databaseResponse => {
-        if(databaseResponse.rows.length > 0){
-          console.log('user already exists');
+        if(databaseResponse.rowCount > 0){
           response.send(false);
         } else {
           try {
@@ -183,7 +199,7 @@ app.post('/users/:username/:email', (request, response) => {
                 if(databaseResponse.rowCount > 0) {
                   console.log('Saved new user');
                 }
-                response.send(databaseResponse.rowCount > 0);
+                response.send(true);
               }); 
           } catch (error) {
             console.error(error);
