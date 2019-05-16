@@ -276,7 +276,7 @@ function getSpotifyRecommendations (token) {
 
 // Returns the first 5 songs that match the specified emotion_id value.
 function returnSongArray(emoValue) {
-  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1 LIMIT 5;';
+  let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1 ORDER BY random() LIMIT 6;';
 
   return client.query(selectStatement, [emoValue])
     .then(data => {
