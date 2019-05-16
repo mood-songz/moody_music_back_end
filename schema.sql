@@ -32,3 +32,5 @@ CREATE TABLE IF NOT EXISTS user_songs (
   FOREIGN KEY (emotion_id) REFERENCES emotions (id),
   FOREIGN KEY (users_id) REFERENCES users (id)
 );
+
+-- newcomment
