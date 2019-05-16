@@ -19,9 +19,8 @@ const PORT = process.env.PORT || 8080;
 
 app.use(cors());
 
-
-
 /*************************  image handler *****************************************/
+
 var storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'public');
@@ -33,12 +32,10 @@ var storage = multer.diskStorage({
 
 //define variable to use sessoion later
 let keyword;
+let success;
 
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
-  //request session
-  // sess=req.session;
-  // sess.keyword;
 
   upload(req, res, function (err) {
     if (err instanceof multer.MulterError) {
@@ -46,6 +43,7 @@ app.post('/upload', (req, res) => {
     } else if (err) {
       return res.status(500).json(err);
     }
+
 
     facepp.setApiKey(process.env.FACE_API_KEY);
     facepp.setApiSecret(process.env.FACE_API_SEC);
@@ -55,32 +53,33 @@ app.post('/upload', (req, res) => {
     };
 
     facepp.post('/detect', parameters, function(err, faceappResponse) {
-      let obj = faceappResponse.faces[0].attributes.emotion;
-      //  let i = arr.indexOf(Math.max(...arr));
-      if(err){
-        console.log('err');
-      }
-      let maxEmotionScore = 0;
-      for (var o in obj) {
-        if(obj[o] > maxEmotionScore){
-          maxEmotionScore = obj[o];
-          if(o === 'happiness'|| o === 'surprise'){
-            keyword = 'happy';
-          } else if (o === 'neutral' || o === 'fear'){
-            keyword = 'neutral';
-          } else {
-            keyword = 'sadness';
+
+      if(faceappResponse.faces.length){
+        let obj = faceappResponse.faces[0].attributes.emotion;
+        if(err){
+          console.error(err);
+        }
+        let maxEmotionScore = 0;
+        for (var o in obj) {
+          if(obj[o] > maxEmotionScore){
+            maxEmotionScore = obj[o];
+            if(o === 'happiness'|| o === 'surprise'){
+              keyword = 'happy';
+            } else if (o === 'neutral' || o === 'fear'){
+              keyword = 'neutral';
+            } else {
+              keyword = 'sadness';
+            }
+            success = true;
           }
         }
-      }
-
+      }   
       console.log(keyword);
-      let response = {'emotion': keyword, 'success' : true};
+      let response = {'emotion': keyword, 'success' : success};
       return res.status(200).send(response);
     });
 
   });
-
 });
 
 // Database Setup
