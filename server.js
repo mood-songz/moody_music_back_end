@@ -36,10 +36,6 @@ let keyword;
 
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
-  //request session
-  // sess=req.session;
-  // sess.keyword;
-
   upload(req, res, function (err) {
     if (err instanceof multer.MulterError) {
       return res.status(500).json(err);
@@ -56,7 +52,6 @@ app.post('/upload', (req, res) => {
 
     facepp.post('/detect', parameters, function(err, faceappResponse) {
       let obj = faceappResponse.faces[0].attributes.emotion;
-      //  let i = arr.indexOf(Math.max(...arr));
       if(err){
         console.log('err');
       }
@@ -73,14 +68,10 @@ app.post('/upload', (req, res) => {
           }
         }
       }
-
-      console.log(keyword);
       let response = {'emotion': keyword, 'success' : true};
       return res.status(200).send(response);
     });
-
   });
-
 });
 
 // Database Setup
