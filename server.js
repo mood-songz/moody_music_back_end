@@ -64,7 +64,7 @@ app.post('/upload', (req, res) => {
             if(o === 'happiness'|| o === 'surprise'){
               keyword = 'happy';
             } else if (o === 'neutral' || o === 'fear'){
-              keyword = 'neutral';
+              keyword = 'meh';
             } else {
               keyword = 'sad';
             }
@@ -89,7 +89,7 @@ function fillEmotionsTable() {
   client.query('SELECT * FROM emotions')
     .then(data => {
       if (data.rowCount === 0) {
-        let moodArray = ['happy', 'sad', 'neutral'];
+        let moodArray = ['happy', 'sad', 'meh'];
         let insertStatement = 'INSERT INTO emotions (emotion, id) VALUES ($1, $2);';
         moodArray.forEach((mood, i )=> {
           let values = [mood, i + 1];
@@ -109,33 +109,31 @@ app.get('/', function(request, response){
 //                       :emotion
 app.get('/recommendations/:emotion', (request, response) => {
   let emotion = request.params.emotion;
-  console.log(emotion);
-  // emoValue = 1 for 'happy', = 2 for 'sad', = 3 for 'neutral'.
+  // emoValue = 1 for 'happy', = 2 for 'sad', = 3 for 'meh'.
   let emoValue;
   if (emotion === 'happy') {
     emoValue = 1;
   } else if (emotion === 'sad') {
     emoValue = 2;
-  } else if (emotion === 'neutral') {
+  } else if (emotion === 'meh') {
     emoValue = 3;
   }
 
   let selectStatement = 'SELECT * FROM songs WHERE emotion_id = $1;';
   client.query(selectStatement, [emoValue])
     .then(data => {
-      if (data.rowCount < 5) {
-        // try {
+      if (data.rowCount < 100) {
         getSpotifyToken()
           .then(token => getSpotifyRecommendations(token))
           .catch(error => console.error(error));
-        // } catch( error ) {
-        //   console.error(error);
-        // }
       }
     })
     .then(
       returnSongArray(emoValue)
-        .then(songArray => response.send(songArray))
+        .then(songArray => {
+          console.log(songArray);
+          response.send(songArray);
+        })
     )
     .catch(error => console.error(error));
 });
@@ -220,9 +218,11 @@ function getSpotifyToken() {
 // Uses access token to get random songs from spotify, and add them to database based on their valence.
 function getSpotifyRecommendations (token) {
   let spotifyUrl = `https://api.spotify.com/v1/search/`;
+  let randomOffset = Math.ceil(Math.random() * 450);
+  console.log(randomOffset);
   return superagent.get(spotifyUrl)
     .set('Authorization', `Bearer ${token}`)
-    .query({'type': 'track', 'query': 'loud'})
+    .query({'type': 'track', 'query': 'year:2010-2019', 'limit': '50', 'offset': `${randomOffset}`})
     .then(response => {
 
       let songsArray = [];
@@ -242,14 +242,14 @@ function getSpotifyRecommendations (token) {
 
           // Assign an emotion_id to each song, based on valence.
           songsArray.forEach((song, i) => {
-            if (response.body.audio_features[i].valence > 0.7) {
+            if (response.body.audio_features[i].valence > 0.6) {
               // happy
               song.emotion_id = 1;
-            } else if ( response.body.audio_features[i].valence < 0.3) {
+            } else if ( response.body.audio_features[i].valence < 0.4) {
               // sad
               song.emotion_id = 2;
             } else {
-              // neutral
+              // meh
               song.emotion_id = 3;
             }
           });
@@ -280,7 +280,15 @@ function returnSongArray(emoValue) {
 
   return client.query(selectStatement, [emoValue])
     .then(data => {
-      return data.rows;
+      if (emoValue === 1) {
+        let pharrellWilliams = {'id': 6788, 'title': 'Happy', 'artist': 'Pharrell', 'spotifyid': '5b88tNINg4Q4nrRbrCXUmg','duration': '20400', 'emotion_id': '1', 'numLikes': 0};
+        return data.rows.slice(0,5).concat(pharrellWilliams);
+      } else if (emoValue === 2) {
+        let rollingStone = {'id': 6789, 'title': 'As Tears Go By - Mono Version', 'artist': 'The Rolling Stones', 'spotifyid': '1LD75COdR1n8jTIjommyS2','duration': '20400', 'emotion_id': '2', 'numLikes': 0};
+        return data.rows.slice(0,5).concat(rollingStone);
+      } else {
+        return data.rows;
+      }
     });
 }
 
