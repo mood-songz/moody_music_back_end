@@ -9,6 +9,7 @@ https://desolate-shelf-44063.herokuapp.com/
 ## Technologies used
 - Node/Express Server
 - Postgres Database
+- Superagent HTTP Requests
 - Heroku for Deployment
 - Face++ Facial Recognition Api
 - Spotify Api
@@ -28,3 +29,5 @@ https://desolate-shelf-44063.herokuapp.com/
 - GET - Retrieves a user from the database
 
 ```/recommendations/:userid/:emotion```
+
+``` ```
