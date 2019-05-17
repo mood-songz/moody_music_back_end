@@ -37,6 +37,7 @@ var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
 
   upload(req, res, function (err) {
+    console.log(req.file);
     if (err instanceof multer.MulterError) {
       return res.status(500).json(err);
     } else if (err) {
