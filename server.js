@@ -138,6 +138,35 @@ app.get('/recommendations/:emotion', (request, response) => {
     .catch(error => console.error(error));
 });
 
+/********************** User Songs Endpoints ********************/
+
+//get all usersongs
+app.get('/usersongs/:user', (request, response) => { 
+
+
+});
+
+//get users songs based on emotions
+app.get('/usersongs/:user/:emotion', (request, response) =>  {
+
+
+});
+
+//get users songs based on emotions
+app.post('/usersongs/:user/:emotion/:songid', (request, response) =>  {
+
+
+});
+
+//deletes user song based on emotions
+app.delete('/usersongs/:user/:emotion/:songid', (request, response) =>  {
+
+
+});
+
+
+
+/********************** Users Endpoints ********************/
 //get user from database
 app.get('/users/:username/:email', (request, response) => {
   let username = request.params.username.toLowerCase();
