@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS emotions, songs;
+DROP TABLE IF EXISTS emotions, songs, user_songs;
 
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -24,13 +24,8 @@ CREATE TABLE IF NOT EXISTS songs (
 
 CREATE TABLE IF NOT EXISTS user_songs (
   id SERIAL PRIMARY KEY,
-  songs_id INTEGER,
-  emotion_id INTEGER,
-  users_id INTEGER,
-  songs_liked BOOLEAN,
-  FOREIGN KEY (songs_id) REFERENCES songs (id),
-  FOREIGN KEY (emotion_id) REFERENCES emotions (id),
-  FOREIGN KEY (users_id) REFERENCES users (id)
+  song_id INTEGER,
+  user_id INTEGER,
+  FOREIGN KEY (song_id) REFERENCES songs (id),
+  FOREIGN KEY (user_id) REFERENCES users (id)
 );
-
--- newcomment
