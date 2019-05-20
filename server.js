@@ -29,10 +29,6 @@ var storage = multer.diskStorage({
   }
 });
 
-//define variable to use sessoion later
-let keyword;
-let success;
-
 var upload = multer({ storage:storage }).single('theFile');
 app.post('/upload', (req, res) => {
 
@@ -51,7 +47,10 @@ app.post('/upload', (req, res) => {
     };
 
     facepp.post('/detect', parameters, function(err, faceappResponse) {
-
+      //emotion to be returned
+      let keyword;
+      //file was a picture of a face
+      let success;
       if(faceappResponse.faces && faceappResponse.faces.length){
         let obj = faceappResponse.faces[0].attributes.emotion;
         if(err){
