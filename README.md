@@ -137,17 +137,7 @@ returns ```true``` or ```false``` to indicate that the user was successfully sav
 
 ## user_songs table
   ```id SERIAL PRIMARY KEY```
-
-  ```songs_id INTEGER```
-
-  ```emotion_id INTEGER```
-
-  ```users_id INTEGER```
-
-  ```songs_liked BOOLEAN```
-
-  ```FOREIGN KEY (songs_id) REFERENCES songs (id)```
-
-  ```FOREIGN KEY (emotion_id) REFERENCES emotions (id)```
-
-  ```FOREIGN KEY (users_id) REFERENCES users (id)```
+  ```song_id INTEGER```
+  ```user_id INTEGER```
+  ```FOREIGN KEY (song_id) REFERENCES songs (id)```
+  ```FOREIGN KEY (user_id) REFERENCES users (id)```

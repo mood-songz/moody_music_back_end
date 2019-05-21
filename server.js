@@ -137,6 +137,83 @@ app.get('/recommendations/:emotion', (request, response) => {
     .catch(error => console.error(error));
 });
 
+/********************** User Songs Endpoints ********************/
+
+//get all usersongs
+app.get('/usersongs/:username', (request, response) => { 
+  let username = request.params.username;
+
+  //let selectStatement = `SELECT * FROM user_songs JOIN users WHERE user = `
+
+});
+
+//get users songs based on emotions
+app.get('/usersongs/:username/:emotion', (request, response) =>  {
+
+
+});
+
+//Adds liked song by user to the user_songs table
+app.post('/usersongs/:username/:spotifyId', (request, response) =>  {
+  let { username, spotifyId } = request.params;
+  let values;
+  let selectStatement;
+  let insertStatement;
+
+  //get userid from the username
+  selectStatement = `SELECT id FROM users WHERE username = $1;`;
+  values = [username];
+  client.query(selectStatement, values)
+    .then(databaseResponse => {
+      // get userid from the users table using the username
+      if(databaseResponse.rowCount === 0) {
+        // not user exists with that username
+        response.send(false);
+      } else {
+        return databaseResponse.rows[0].id;
+      }
+    })
+    .then(useridFromDatabase => {
+      selectStatement = `SELECT id FROM songs WHERE spotifyid = $1;`;
+      values = [spotifyId];
+      client.query(selectStatement, values)
+        .then(songsResponseFromDatabase=> {
+          // get songid from the songs table using the spotifyId
+          if(songsResponseFromDatabase.rowCount === 0) {
+            //song does not exist in database
+            response.send(false);
+          } else {
+            return [useridFromDatabase, songsResponseFromDatabase.rows[0].id];
+          }
+        })
+        .then(userIdAndSongId => {
+          //save to the database if both username and songid in the database if not already in there
+          selectStatement = `SELECT *  FROM user_songs WHERE user_id = $1 and song_id = $2;`;
+          values = userIdAndSongId;
+
+          client.query(selectStatement, values)
+            .then(userSongsResponse => {
+              if(userSongsResponse.rowCount > 0) {
+                console.log('User Song already in user song data base');
+              } else {
+                insertStatement = `INSERT INTO user_songs (user_id, song_id) VALUES ($1, $2);`;
+                client.query(insertStatement, values)
+                  .then(response.send(true));
+              }
+            });
+        });
+    });
+});
+
+//deletes user song based on emotions
+app.delete('/usersongs/:username/:emotion/:spotifyid', (request, response) =>  {
+
+
+});
+
+
+
+/********************** Users Endpoints ********************/
 //get user from database
 app.get('/users/:username/:email', (request, response) => {
   let username = request.params.username.toLowerCase();
